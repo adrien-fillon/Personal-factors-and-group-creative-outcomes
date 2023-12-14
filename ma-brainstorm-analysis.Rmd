@@ -1,0 +1,416 @@
+---
+title: "Personal factors and creative outcomes meta-analysis"
+description: null
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document:
+    fig_height: 6
+    fig_width: 8
+  html_document:
+    css: custom.css
+    theme: united
+    toc: yes
+Author: me
+---
+```{r setup, include=FALSE}
+options(knitr.duplicate.label = "allow")
+knitr::opts_chunk$set(echo = TRUE)
+
+filename<-"creativitymeta.xlsx"
+
+list.of.packages <- c("readxl", "psychmeta", "metafor", "metaviz", "tidyverse")
+
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages, dependencies = TRUE)
+invisible(lapply(list.of.packages, library, character.only = TRUE))
+
+#if (!require("devtools")) {
+#  install.packages("devtools")
+#}
+#devtools::install_github("MathiasHarrer/dmetar")
+library(dmetar)
+#SETTING UP#
+#Set year and language used in R environment
+
+Year<-as.numeric(format(Sys.Date(), "%Y"))
+
+Sys.setenv(LANG = "en")
+
+# Type the last name of the first author here
+Author<-"Adrien Fillon"
+
+Year <- 2020
+
+# Meta-Analysis Title
+Title<-"Correlational meta-analysis"
+
+# This file conducts a meta-analysis of correlational studies. Define the variable names for the relationship of interest
+X<-"Personal factors"
+Y<-"Creative outcomes"
+
+#FORMAT#
+
+#Set formatting options#
+options(scipen=999, digits = 3)
+init.value <- c(0.5, 0.2, 0.10)
+alpha <- 0.05		# Size of two-sided test
+
+```
+
+# Correlation analyses #
+This file documents the analyses conducted for `r Author` (`r Year`) *`r Title`*
+Analyses were conducted using the file `r filename`, to examine the relationship between `r X` and `r Y`.
+
+```{r coormeta,echo=FALSE, message=FALSE, warning=FALSE}
+
+dataset = read_excel(filename, sheet = "Main Coding Sheet", skip = 2)
+
+dataset$articlestudy <- paste(dataset$Article, "/", dataset$Number, "/", dataset$Study)
+
+res_mainanalysis <- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personal.factor, construct_y = dataset$Creative.outcome, 
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_mainanalysis <- plot_forest(res_mainanalysis)
+res_mainanalysis <- sensitivity(res_mainanalysis, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_mainanalysis, "results_mainanalysis")
+
+out_cumulative <- get_cumulative(res_mainanalysis)
+out_cumulative$`analysis id: 1`$barebones
+
+out_plots <- get_plots(res_mainanalysis)
+out_plots$cumulative$`analysis id: 1`$barebones$plots
+# construct_order = c("Open", "Cons", "Ex","Aggre", "Neuro", "EI", "Anx", "SE", "Nfcog", "Motiv" )
+
+# PET PEESE
+library(metafor)
+datapubbias <- escalc(measure = "COR", ri = r, 
+                     ni = N.post, data = dataset, append = TRUE)
+#PET
+PET<-lm(datapubbias$yi~sqrt(datapubbias$vi), weights = 1/sqrt(datapubbias$vi))
+summary(PET)
+confint(PET)
+
+#PEESE
+PEESE<-lm(datapubbias$yi~datapubbias$vi, weights = 1/datapubbias$vi)
+summary(PEESE)
+confint(PEESE)
+
+dat_pcurve<-data.table::data.table(TE = datapubbias$r, seTE = sqrt(datapubbias$vi), studlab = datapubbias$Article) 
+pcurve<-pcurve(dat_pcurve, effect.estimation = TRUE, N=datapubbias$N.post)
+
+```
+
+### p-curve : the power of studies included is  `r pcurve$Power$powerEstimate`, 95%CI `r pcurve$Power$powerLower`, `r pcurve$Power$powerUpper`
+Evidential value present :`r pcurve$EvidencePresent`
+Evidential value absent or inadequate : `r pcurve$EvidenceAbsent`
+
+
+```
+
+# MODERATOR ANALYSIS
+
+## Familiarity
+
+0 = not familiar
+1 = familiar
+
+```{r modfam,echo=FALSE, message=FALSE, warning=FALSE}
+ 
+res_familiarity<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Familiarity,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_familiarity <- plot_forest(res_familiarity)
+res_familiarity <- sensitivity(res_familiarity, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_familiarity, "results_familiarity")
+
+
+```
+
+
+## skilldiversity
+
+0 = heterogenous
+1 = homogenous
+
+```{r modskill, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_homogeneity<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = skilldiversity,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_homogeneity <- plot_forest(res_homogeneity)
+res_homogeneity <- sensitivity(res_homogeneity, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_homogeneity, "results_homogeneity")
+
+```
+
+
+## Demography
+
+0 = demography not diverse
+1 = demography diverse
+
+```{r moddem, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_demography<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Demography,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_demography <- plot_forest(res_demography)
+res_demography <- sensitivity(res_demography, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_demography, "results_demography")
+
+```
+
+## Constraint
+
+0 = no constraint
+1 = production blocking
+2 = asynchrony
+
+```{r modconstraint, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_constraint<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Constraint,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_constraint <- plot_forest(res_constraint)
+res_constraint <- sensitivity(res_constraint, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_constraint, "results_constraint")
+
+```
+
+## Task.Type
+0 = conjunctive
+1 = disjunctive
+
+
+```{r modtasktype, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_taskt<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Task.Type,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_taskt <- plot_forest(res_taskt)
+res_taskt <- sensitivity(res_taskt, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_taskt, "results_tasktype")
+
+```
+
+## Creative.Phase
+0 = convergent
+1 = divergent
+
+
+```{r modcreativephase, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_creaph<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Creative.Phase,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_creaph <- plot_forest(res_creaph)
+res_creaph <- sensitivity(res_creaph, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_creaph, "results_creativephase")
+
+```
+
+## Number.of.Participants
+
+Indicate number per activity session
+
+```{r nb, echo=FALSE, message=FALSE, warning=FALSE}                               
+
+res_nbpart<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Number.of.Participants,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_nbpart <- plot_forest(res_nbpart)
+res_nbpart <- sensitivity(res_nbpart, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_nbpart, "results_numberpart")
+
+```
+
+## Time.limit
+
+Indicate the limit of the activity
+
+
+```{r timelimit, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_timelimit<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Time.limit,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_timelimit <- plot_forest(res_timelimit)
+res_timelimit <- sensitivity(res_timelimit, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_timelimit, "results_timelimit")
+
+```
+
+## Leadership
+0 = transformational
+1 = transactional
+
+
+```{r leadership, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_leadership<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Leadership,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_leadership <- plot_forest(res_leadership)
+res_leadership <- sensitivity(res_leadership, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_leadership, "results_leadership")
+
+
+ 
+```
+
+## Publication.Status 
+
+1 = Published
+0 = Unpublished
+
+
+```{r publicationstatus, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_pubstat<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Publication.Status,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_pubstat <- plot_forest(res_pubstat)
+res_pubstat <- sensitivity(res_pubstat, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_pubstat, "results_pubstatus")
+
+
+```
+
+Gender
+
+Calculate by taking male/total sample size.
+
+
+```{r gender, echo=FALSE, message=FALSE, warning=FALSE}
+
+res_gender<- ma_r(rxyi = dataset$r, n = dataset$N.post, sample_id = dataset$articlestudy, ma_method = "ad",
+                      construct_x = dataset$Personalfactor, construct_y = dataset$creativeoutcome,
+                      rxx = dataset$Personal.factor.reliability, ryy = dataset$CO.reliability, moderators = Gender,
+                      control = control_psychmeta(use_all_arts = TRUE), 
+                      data = dataset)
+res_gender <- plot_forest(res_gender)
+res_gender <- sensitivity(res_gender, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_gender, "results_leadership")
+
+
+```
+
+# Plots
+
+
+```{r plots, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Viewing forest plots
+# To change the variables plotted, set `ma_obj` to the appropriate meta-analyis
+# results (res_mainanalysis, res_familiarity, res_homogeneity, res_demography, res_constraint, res_taskt, res_creaph, res_nbpart, res_timelimit, res_leadership, res_pubstat, res_gender) and `variables` to a vector for the 
+# desired construct pair--for example, `c("O", "Nb")`.
+
+# ma_obj <- res_mainanalysis
+# variables <- c("C", "Useful")
+# get_plots(ma_obj, analyses = list(construct_pair = list(variables)),
+#           plot_types = "forest")$forest[[1]]$moderated$barebones
+
+
+# Idem for viewing cumulative meta-analysis plots
+
+# ma_obj <- res_mainanalysis
+# variables <- c("C", "Useful")
+# get_plots(ma_obj, analyses = list(construct_pair = list(variables)),
+#           plot_types = "cumulative")$cumulative[[1]]$artifact_distribution$true_score$plots  
+
+
+
+
+```
+
+# Power of studies included in the analysis
+
+```{r power, echo=FALSE, message=FALSE, warning=FALSE}
+
+# This chunk will help you create a sunset plot to view the power of every studies in the meta-anaysis depending of the correlation observed.
+#We create the dataset.
+
+dataset <- metafor::escalc(measure = "ZCOR", ri = r, 
+                     ni = N.post, data = dataset, append = TRUE)
+
+
+#we create a meta-analysis object
+res <- rma.uni(yi, vi, data=dataset) 
+#and we vizualize the power of the analysis.
+viz_sunset(res, 
+           contours = TRUE,
+           power_contours =  "continuous")
+
+# One can also add the argument true_effect = 0.XX for the minimal effect size of interest.
+
+```
+
+# Mean reliability scale (for supplementary)
+```{r RS, echo=FALSE, message=FALSE, warning=FALSE}
+# This chunk will help you create a mean reliability scale table that can replace the empty one in supplementary in ordre to assess the quality of the scales we used.
+
+# the internal psychmeta function summarize_ads can summarize the mean and variance of artifact distribution.
+# for an understanding of this table, see Wiernik & Dahlke (2019).
+
+#The amount of measurement error in a sample of scores is quantified using a reliability coefficient, defined as the proportion of the observed-score variance that is consistent (i.e., believed to be “true”). Conceptually, the reliability coefficient is the correlation between two parallel measures of a construct. The square root of the reliability coefficient also called the measurement quality index; Schmidt & Hunter, 2015) is the correlation between the measured (observed) variable and its underlying latent variable.
+
+
+artifactdistribution<-psychmeta:::summarize_ads(res_mainanalysis) %>% 
+  filter(Artifact %in% c("rxxi_irr", "qxi_irr")) %>%
+  as_tibble() %>% 
+  mutate(k_total = format_num(.$k_total, digits = 0),
+         N_total = format_num(.$N_total, digits = 0), 
+         mean = format_num(.$mean, digits = 3),
+         sd = format_num(.$sd, digits = 3),
+         sd_res = format_num(.$sd_res, digits = 3))
+
+knitr::kable(artifactdistribution)
+
+
+```
+
+
+# Inter-relations
+
+
+```{r inter, message=FALSE, warning=FALSE, include=FALSE}
+
+# Running the same analysis, using the correlation in the interrelation sheet.
+
+datinter = read_excel(filename, sheet = "interrelation", skip = 2)
+
+datinter$articlestudy <- paste(datinter$Article, "/", datinter$Study)
+
+res_inter<- ma_r(rxyi = datinter$r, n = datinter$N.post, 
+                 sample_id = datinter$articlestudy, ma_method = "ad",
+                      construct_x = datinter$`Construct 1`,
+                 construct_y = datinter$`Construct 2`, 
+                 control = control_psychmeta(use_all_arts = TRUE), 
+                      data = datinter)
+res_inter <- plot_forest(res_inter)
+res_inter <- sensitivity(res_inter, leave1out = FALSE, bootstrap = FALSE)
+metabulate(res_inter, "results_interrelation")
+

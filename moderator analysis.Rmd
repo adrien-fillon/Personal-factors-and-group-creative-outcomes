@@ -1,0 +1,104 @@
+---
+title: "Moderator analysis personal factor creativity"
+author: "Adrien Fillon"
+date: "16/03/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+filename<-"creativitymeta.xlsx"
+list.of.packages <- c("readxl", "psychmeta", "metafor", "dplyr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages, dependencies = TRUE)
+invisible(lapply(list.of.packages, library, character.only = TRUE))
+library(dmetar)
+Year<-as.numeric(format(Sys.Date(), "%Y"))
+Sys.setenv(LANG = "en")
+Author<-"Adrien Fillon"
+Year <- 2022
+Title<-"Correlational meta-analysis"
+X<-"Personal factors"
+Y<-"Creative outcomes"
+options(scipen=999, digits = 3)
+init.value <- c(0.5, 0.2, 0.10)
+alpha <- 0.05
+dataset = read_excel(filename, sheet = "Main Coding Sheet", skip = 2)
+dataset$articlestudy <- paste(dataset$Article, "/", dataset$Number, "/", dataset$Study)
+dataset <- escalc(measure = "COR", ri = r, 
+                     ni = N.post, data = dataset, append = TRUE)
+
+```
+
+## Familiarity
+
+0 = not familiar
+1 = familiar
+
+```{r cars, echo=FALSE}
+library(knitr)
+dataset1<-dataset %>% filter (!is.na(Familiarity))
+modfam <- rma(yi, vi, 
+                     mods = ~Familiarity, 
+                     method = "REML", data = dataset1)
+modfam
+
+dataset1 <- dataset %>% filter (Familiarity == 0)
+modfam0 <- rma(yi, vi, method = "REML", data = dataset1)
+
+dataset1 <- dataset %>% filter (Familiarity == 1)
+modfam1 <- rma(yi, vi, method = "REML", data = dataset1)
+
+result <- data.frame(
+  modérateur = as.character(c("Non familier","Familier")),
+  k = as.numeric(c(modfam0$k, modfam1$k)),
+  r = as.numeric(c(modfam0$b, modfam1$b)), 
+  ET = as.numeric(c(modfam0$se, modfam1$se)),
+      tau2 = as.numeric(c(c(modfam0$tau2, modfam1$tau2))))
+kable(result, caption = "Modérateur")
+
+
+```
+
+Number of participants
+
+```{r pressure, echo=FALSE}
+
+dataset1<-dataset %>% filter (!is.na(Number.of.Participants))
+modNb <- rma(yi, vi, 
+                     mods = ~Number.of.Participants, 
+                     method = "REML", data = dataset1)
+modNb
+
+
+
+```
+
+Time limit
+
+```{r echo=FALSE, , echo=FALSE}
+
+dataset1<-dataset %>% filter (!is.na(Time.limit))
+modtime <- rma(yi, vi, 
+                     mods = ~Time.limit, 
+                     method = "REML", data = dataset1)
+modtime
+
+
+```
+
+Gender
+
+```{r echo=FALSE, , echo=FALSE}
+
+dataset1<-dataset %>% filter (!is.na(Gender))
+modgender <- rma(yi, vi, 
+                     mods = ~Gender, 
+                     method = "REML", data = dataset1)
+modgender
+
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
